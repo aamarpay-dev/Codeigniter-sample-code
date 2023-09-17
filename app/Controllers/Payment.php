@@ -2,6 +2,8 @@
 
 namespace App\Controllers;
 
+use CodeIgniter\HTTP\Request;
+
 class Payment extends BaseController
 {
     public function index()
@@ -10,82 +12,108 @@ class Payment extends BaseController
     }
 
     public function initiatePayment(){
-
         $email = $_POST['email'];
         $amount = $_POST['amount'];
-        $value='';
-        $key='';
-        $fields_string='';
+        $store_id = "aamarpaytest";  // You have to use your Store ID / MerchantID here
+        $signature_key="dbb74894e82415a2f7ff0ec3a97e4183"; // Your have to use your signature key here ,it will be provided by aamarPay
+        $url = 'https://sandbox.aamarpay.com/jsonpost.php'; //sandbox
+       // $url = 'https://secure.aamarpay.com/jsonpost.php'; //live url
+       $success_url=base_url('payment/success');
+       $fail_url=base_url('payment/fail');
+       $cancel_url = base_url('payment/cancel');
+       $tran_id = "test".rand(1111111,9999999); // Transection id need to be unique for each successful transection.
 
-        $url = 'https://sandbox.aamarpay.com/request.php'; //sandbox
-       // $url = 'https://secure.aamarpay.com/request.php'; //live url
-
-        $fields = array(
-            'store_id' => '', //enter your store id
-            'amount' => $amount, 
-            'payment_type' => 'VISA',
-            'currency' => 'BDT', 
-            'tran_id' => rand(111111111111,999999999999), //make unique transaction ID for each transaction 
-            'cus_name' => 'abcd', 
-            'cus_email' => $email,
-            'cus_add1' => 'Dhaka',
-            'cus_add2' => 'Mohakhali DOHS',
-            'cus_city' => 'Dhaka',
-            'cus_state' => 'Dhaka',
-            'cus_postcode' => '1206',
-            'cus_country' => 'Bangladesh',
-            'cus_phone' => '234234234',
-            'cus_fax' => 'Not¬Applicable',
-            'ship_name' => '234234',
-            'ship_add1' => 'House B-121, Road 21', 'ship_add2' => 'Mohakhali',
-            'ship_city' => 'Dhaka', 'ship_state' => 'Dhaka',
-            'ship_postcode' => '1212', 'ship_country' => 'Bangladesh',
-            'desc' => '234234aef', 'success_url' => base_url('payment/success'),
-            'fail_url' => base_url('payment/fail'),
-            'cancel_url' => base_url('payment/cancel'),
-            'opt_a' => '', 'opt_b' => '',
-            'opt_c' => '', 'opt_d' => '',
-            'signature_key' => '');
-            
-        foreach($fields as $key=>$value) { $fields_string .= $key.'='.$value.'&'; }
-        $fields_string = rtrim($fields_string, '&'); 
-      
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_VERBOSE, true);
-        curl_setopt($ch, CURLOPT_URL, $url);  
-        curl_setopt($ch, CURLOPT_POST, count($fields)); 
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $fields_string);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        $url_forward = str_replace('"', '', stripslashes(curl_exec($ch)));	
-        curl_close($ch); 
-     
-
-        $this->redirect_to_merchant($url_forward);
+       $curl = curl_init();
+       
+       curl_setopt_array($curl, array(
+         CURLOPT_URL => $url,
+         CURLOPT_RETURNTRANSFER => true,
+         CURLOPT_ENCODING => '',
+         CURLOPT_MAXREDIRS => 10,
+         CURLOPT_TIMEOUT => 0,
+         CURLOPT_FOLLOWLOCATION => true,
+         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+         CURLOPT_CUSTOMREQUEST => 'POST',
+         CURLOPT_POSTFIELDS =>'{
+           "store_id": "'.$store_id.'",
+           "tran_id": "'.$tran_id.'",
+           "success_url": "'.$success_url.'",
+           "fail_url": "'.$fail_url.'",
+           "cancel_url": "'.$cancel_url.'",
+           "amount": "'.$amount.'",
+           "currency": "BDT",
+           "signature_key": "'.$signature_key.'",
+           "desc": "Merchant Registration Payment",
+           "cus_name": "Customer Name",
+           "cus_email": "'.$email.'",
+           "cus_add1": "House B-158 Road 22",
+           "cus_add2": "Mohakhali DOHS",
+           "cus_city": "Dhaka",
+           "cus_state": "Dhaka",
+           "cus_postcode": "1206",
+           "cus_country": "Bangladesh",
+           "cus_phone": "0178273****",
+           "type": "json"
+       }',
+         CURLOPT_HTTPHEADER => array(
+           'Content-Type: application/json'
+         ),
+       ));
+       
+       $response = curl_exec($curl);
+       
+       curl_close($curl);
+       
+       $responseObj = json_decode($response);
+       
+       if(isset($responseObj->payment_url) && !empty($responseObj->payment_url)) {
+            $paymentUrl = $responseObj->payment_url;
+            header("Location: " . $paymentUrl);
+            exit(); 
+       }else{
+           echo $response;
+       }
     }
 
-    public function redirect_to_merchant($url) {
-
-        ?>
-        <html xmlns="http://www.w3.org/1999/xhtml">
-          <head><script type="text/javascript">
-            function closethisasap() { document.forms["redirectpost"].submit(); } 
-          </script></head>
-          <body onLoad="closethisasap();">
-          
-            <form name="redirectpost" method="post" action="<?php echo 'https://sandbox.aamarpay.com/'.$url; ?>"></form>
-            <!-- for live url https://secure.aamarpay.com -->
-          </body>
-        </html>
-        <?php	
-        exit;
-    } 
-
+    
     public function successPayment(){
-        var_dump($_POST);
+        $merTxnId = $_POST['mer_txnid'];
+        $store_id = "aamarpaytest";  // You have to use your Store ID / MerchantID here
+        $signature_key="dbb74894e82415a2f7ff0ec3a97e4183"; // Your have to use your signature key here ,it will be provided by aamarPay
+        $url = "https://sandbox.aamarpay.com/api/v1/trxcheck/request.php?request_id=$merTxnId&store_id=$store_id&signature_key=$signature_key&type=json"; //sandbox
+      //$url = "https://secure.aamarpay.com/api/v1/trxcheck/request.php?request_id=$merTxnId&store_id=$store_id&signature_key=$signature_key&type=json"; //live url
+        $curl_handle=curl_init();
+        curl_setopt($curl_handle,CURLOPT_URL,$url);
+
+        curl_setopt($curl_handle, CURLOPT_VERBOSE, true);
+        curl_setopt($curl_handle, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl_handle, CURLOPT_SSL_VERIFYPEER, false);
+        $buffer = curl_exec($curl_handle);
+        curl_close($curl_handle);
+        $a = (array)json_decode($buffer);
+        echo "<pre>";
+        print_r($a);
+        echo "</pre>";
+
     }
     public function failedPayment(){
-        var_dump($_POST);
+        $merTxnId = $_POST['mer_txnid'];
+        $store_id = "aamarpaytest";  // You have to use your Store ID / MerchantID here
+        $signature_key="dbb74894e82415a2f7ff0ec3a97e4183"; // Your have to use your signature key here ,it will be provided by aamarPay
+        $url = "https://sandbox.aamarpay.com/api/v1/trxcheck/request.php?request_id=$merTxnId&store_id=$store_id&signature_key=$signature_key&type=json"; //sandbox
+      //$url = "https://secure.aamarpay.com/api/v1/trxcheck/request.php?request_id=$merTxnId&store_id=$store_id&signature_key=$signature_key&type=json"; //live url
+        $curl_handle=curl_init();
+        curl_setopt($curl_handle,CURLOPT_URL,$url);
+
+        curl_setopt($curl_handle, CURLOPT_VERBOSE, true);
+        curl_setopt($curl_handle, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl_handle, CURLOPT_SSL_VERIFYPEER, false);
+        $buffer = curl_exec($curl_handle);
+        curl_close($curl_handle);
+        $a = (array)json_decode($buffer);
+        echo "<pre>";
+        print_r($a);
+        echo "</pre>";
     }
     public function cancelPayment(){
         return view('payment');
